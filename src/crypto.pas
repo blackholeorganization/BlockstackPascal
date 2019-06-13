@@ -33,6 +33,8 @@ type
     class function Encrypt(const AKey: RawUTF8; const AInput: RawByteString; ALength: integer; out AOutput: RawByteString): boolean; overload;
     class function Decrypt(const AKey: RawUTF8; const AInput: RawByteString; out AOutput: RawByteString): boolean; overload;
 
+    class function EncryptPKCS7(const AKey: RawUTF8; const ASalt: RawByteString; ARounds: integer; const AInput: RawByteString; AIVAtBeginning: boolean): RawByteString;
+
     class function JWTEncode(const APayload: RawByteString; APrivateKey: IECPrivateKeyParameters): RawByteString;
     class function JWTDecode(const AData: RawByteString; out AHeadPayload: RawUTF8; out ADecodedPayload, ASignature: RawByteString): boolean;
 
@@ -43,6 +45,8 @@ type
     class function PrivateKeyAsString(APrivateKey: IECPrivateKeyParameters): RawUTF8;
     class function PublicKeyAsString(APublicKey: IECPublicKeyParameters): RawUTF8;
     class function PublicKeyAsAddress(APublicKey: IECPublicKeyParameters): RawUTF8;
+
+    class function RandomURLSafePassword(Len: integer): RawUTF8;
   end;
 
 implementation
@@ -58,7 +62,7 @@ uses
   ECDSASigner, HlpRIPEMD160, ClpEncoders, ClpDigestUtilities, ClpIBasicAgreement,
   ClpIBufferedBlockCipher, ClpIBlockCipherModes, ClpIECIESPublicKeyParser,
   ClpECIESPublicKeyParser, ClpIPaddingModes, ClpIPaddedBufferedBlockCipher,
-  ClpIECDHBasicAgreement,ClpIEphemeralKeyPairGenerator,ClpIECKeyPairGenerator,ClpISecureRandom;
+  ClpIECDHBasicAgreement, ClpIEphemeralKeyPairGenerator, ClpIECKeyPairGenerator, ClpISecureRandom;
 
 { TCrypto }
 
@@ -259,6 +263,15 @@ begin
   Result := True;
 end;
 
+class function TCrypto.EncryptPKCS7(const AKey: RawUTF8; const ASalt: RawByteString; ARounds: integer; const AInput: RawByteString; AIVAtBeginning: boolean): RawByteString;
+var
+  Enc: TAESCBC;
+begin
+    Enc := TAESCBC.CreateFromPBKDF2(aKey, aSalt, aRounds);
+    Result := Enc.EncryptPKCS7(AInput, AIVAtBeginning);
+    Enc.Free;
+end;
+
 class function TCrypto.JWTEncode(const APayload: RawByteString; APrivateKey: IECPrivateKeyParameters): RawByteString;
 var
   HeadPayload: RawUTF8;
@@ -355,11 +368,11 @@ begin
   BC := [0] + BC;
   BCC := BC;
   SHA.Full(Pointer(BCC), Length(BCC), Digest);
-  SetLength(BCC,Length(Digest));
-  Move(Digest[0],BCC[0],Length(Digest));
+  SetLength(BCC, Length(Digest));
+  Move(Digest[0], BCC[0], Length(Digest));
   SHA.Full(Pointer(BCC), Length(BCC), Digest);
-  SetLength(BCC,Length(Digest));
-  Move(Digest[0],BCC[0],Length(Digest));
+  SetLength(BCC, Length(Digest));
+  Move(Digest[0], BCC[0], Length(Digest));
   BC += [BCC[0], BCC[1], BCC[2], BCC[3]];
   with TBase58.Create do
   begin
@@ -368,5 +381,21 @@ begin
   end;
 end;
 
+class function TCrypto.RandomURLSafePassword(Len: integer): RawUTF8;
+const
+  CHARS: array [0..61] of AnsiChar =
+    'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+var
+  i: integer;
+  P: PAnsiChar;
+begin
+  Result := TAESPRNG.Main.FillRandom(Len);
+  P := pointer(Result);
+  for i := 1 to Len do
+  begin
+    P^ := CHARS[Ord(P^) mod SizeOf(CHARS)];
+    Inc(P);
+  end;
+end;
 
 end.
