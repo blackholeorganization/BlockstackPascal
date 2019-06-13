@@ -13,7 +13,7 @@ type
   { TNetwork }
 
   TNetwork = class
-    class function Fetch(AURL: string; out AResponseCode: integer; out AResponse: RawByteString; AHeaders: TRawUTF8DynArray = nil; AMethod: string = 'GET'; AData: RawUTF8 = ''): boolean; overload;
+    class function Fetch(AURL: string; out AResponseCode: integer; out AResponse: RawByteString; AHeaders: TRawUTF8DynArray = nil; AMethod: string = 'GET'; AData: RawUTF8 = ''; AMimeType: RawUTF8 = ''): boolean; overload;
     class function ResponseCodeToErrorKind(AResponseCode: integer): TNetworkErrorKind;
   end;
 
@@ -23,7 +23,7 @@ uses httpsend, ssl_openssl, ssl_openssl_lib;
 
 { TNetwork }
 
-class function TNetwork.Fetch(AURL: string; out AResponseCode: integer; out AResponse: RawByteString; AHeaders: TRawUTF8DynArray; AMethod: string; AData: RawUTF8): boolean;
+class function TNetwork.Fetch(AURL: string; out AResponseCode: integer; out AResponse: RawByteString; AHeaders: TRawUTF8DynArray; AMethod: string; AData: RawUTF8; AMimeType: RawUTF8): boolean;
 var
   h: RawUTF8;
 begin
@@ -32,7 +32,10 @@ begin
       for h in AHeaders do
         Headers.Add(h);
       if (AMethod = 'POST') then
+      begin
+        MimeType := AMimeType;
         Document.Write(AData[1], Length(AData));
+      end;
       Result := HTTPMethod(AMethod, AURL) and (ResultCode < 300);
       AResponseCode := ResultCode;
       SetString(AResponse, PChar(Document.Memory), Document.Size div SizeOf(char));
